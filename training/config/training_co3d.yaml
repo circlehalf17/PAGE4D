@@ -98,7 +98,7 @@ logging:
 checkpoint:
   save_dir: /workspace/outputs/checkpoints/PAGE4D/${exp_name}
   save_freq: 25
-  resume_checkpoint_path: /workspace/outputs/checkpoints/PAGE4D/pretrained/checkpoint_nomask.pt
+  resume_checkpoint_path: /workspace/outputs/checkpoints/VGGT/pretrained/vggt_1b.pt
   strict: False
 
 loss:

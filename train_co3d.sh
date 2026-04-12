@@ -11,7 +11,7 @@
 #SBATCH --error=/dev/null
 #SBATCH --nodelist=iREMB-C-08
 
-# 코드는 (2,18,20,21,49,50)줄만 수정
+# 코드는 (2,18,20,21,51,52)줄만 수정
 
 set -euo pipefail
 
@@ -42,12 +42,15 @@ rm -f "/scratch/mip25/wonbinlee/outputs/checkpoints/${PROJECT_NAME}/${EXPERIMENT
 
 srun --mpi=pmix singularity exec --nv \
     --bind /scratch/mip25/wonbinlee:/workspace \
+    --bind /usr/lib64/libXext.so.6:/usr/lib64/libXext.so.6 \
+    --bind /usr/lib64/libXext.so.6.4.0:/usr/lib64/libXext.so.6.4.0 \
     --pwd /workspace \
     "$SIF_IMAGE" \
     bash -c "
         set -euo pipefail
         export PATH=/workspace/envs/page4d/bin:\$PATH
         export PYTHONPATH=/workspace/${PROJECT_NAME}/training:/workspace/${PROJECT_NAME}/model:\${PYTHONPATH:-}
+        export LD_LIBRARY_PATH=/usr/lib64:\${LD_LIBRARY_PATH:-}
 
         nvidia-smi
 
@@ -56,7 +59,24 @@ srun --mpi=pmix singularity exec --nv \
         MAX_RETRIES=40
         RETRY_COUNT=0
 
-        TRAINING_CMD=\"torchrun --nproc_per_node=1 --master_port=29509 \
+        # 포트 충돌 방지: 사용 가능한 포트 자동 탐색
+        MASTER_PORT=\$(python3 -c \"
+import socket
+for port in range(29500, 29600):
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        s.bind(('127.0.0.1', port))
+        s.close()
+        print(port)
+        break
+    except OSError:
+        pass
+\")
+        echo \"Using MASTER_PORT=\$MASTER_PORT\"
+
+        TRAINING_CMD=\"torchrun --nproc_per_node=1 \
+            --master_addr=127.0.0.1 --master_port=\$MASTER_PORT \
             /workspace/${PROJECT_NAME}/training/launch_gra.py --config ${CONFIG_NAME}\"
 
         cd /workspace/${PROJECT_NAME}/training
